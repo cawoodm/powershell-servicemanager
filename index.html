@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html>
     <head>
         <title>PowerShell Service Manager</title>
@@ -26,10 +25,10 @@
     <v-container fill-height grid-list-md text-xs>
         <v-layout row wrap>
             <v-flex xs6>
-                    <ps-dir class="drop" hostname="server1" filter="wsea*"></ps-dir>
+                    <single-environment name="dev"></single-environment>
             </v-flex>
             <v-flex xs6>
-                    <ps-dir hostname="server2" filter="s*"></ps-dir>
+                <single-environment name="test"></single-environment>
             </v-flex>
         </v-layout>
     </v-container>
@@ -41,28 +40,33 @@
 <script src="vuetify.js"></script>
 </body>
 <script>
-//console.log(process.env)
 const dp = console.log;
-const PS1 = require("./pshell_");
-//PS.setConsole(console);
-//var pow = require("./pow").pow;
 const shell = require("node-powershell");
-let PS= new shell({
-    executionPolicy: 'Bypass',
-    noProfile: false,
-    verbose: true
-});
-PS.addCommand("Get-Service | Select -First 3");
-PS.invoke().then((output) => {
-    console.log("Output", output)
-});
+const config = require('./config.json');
 let app = {};
 
-Vue.component('ps-dir', {
-    props: ['hostname', 'filter'],
+Vue.component('single-environment', {
+    props: ['name'],
+    data: function() {
+        let data = {};
+        data.config = config.environments.filter(f=>f.key==this.name)[0];
+        data.servers = data.config.servers;
+        return data;
+    },
+    template: `
+    <div>{{config.label}}
+        <single-host v-for="server in servers" :key="server.key" :hostname="server.host" :label="server.label" :filter="server.services"></single-host>
+    </div>
+    `
+});
+
+Vue.component('single-host', {
+    props: ['hostname', 'filter', 'label'],
     data: function () {
         this.message=''; //PS.exec("Get-Location").Path
-        if (!this.data) this.data = {results: null, Hostname: this.hostname, Filter: this.filter, message: this.message}
+        dp(this.filter)
+        this.PS = new shell({ executionPolicy: 'Bypass', noProfile: false, verbose: true });
+        if (!this.data) this.data = {results: null, Hostname: this.hostname, Filter: this.filter, message: this.message, PS: this.PS, errormessage: null}
         try {
             this.getResults();
         } catch(e) {
@@ -72,29 +76,17 @@ Vue.component('ps-dir', {
     },
     //created() {},
     methods: {
-        clickStart: function(SvcName) {
+        serviceMessage: function(SvcName, Action) {
             try {
-                let res = PS.exec(`Start-Service ${SvcName}`, {jsonOutput:false});
-                if (res) return alert(res); // Silence means it's done
-                this.getResults();
-            } catch(e) {
-                alert(e)
-            }
-        },
-        clickRestart: function(SvcName) {
-            try {
-                let res = PS.exec(`Restart-Service ${SvcName}`, {jsonOutput:false});
-                if (res) return alert(res); // Silence means it's done
-                this.getResults();
-            } catch(e) {
-                alert(e)
-            }
-        },
-        clickStop: function(SvcName) {
-            try {
-                let res = PS.exec(`Stop-Service ${SvcName}`, {jsonOutput:false});
-                if (res) return alert(res); // Silence means it's done
-                this.getResults();
+                Actions={start:"Start",stop:"Stop",restart:"Restart"}
+                Action=Actions[Action];
+                this.PS.addCommand(`${Action}-Service ${SvcName}`);
+                this.PS.invoke()
+                    .then((output) => {
+                        this.getResults();
+                    }).catch((err) => {
+                        console.error("ERROR", err)
+                    });
             } catch(e) {
                 alert(e)
             }
@@ -102,47 +94,28 @@ Vue.component('ps-dir', {
         getResults: function() {
             statii=[null,"Stopped", "StartPending", "StopPending", "Running", "ContinuePending", "PausePending", "Paused"];
             try {
-                let remoteCommand = `Get-Service | Select Name, Status, DisplayName, StartType -First 3`
-    /*PS.addCommand("$pdd = Get-Content credential1.cred | ConvertTo-SecureString");
-    PS.addCommand("$cred = New-Object -TypeName System.Management.Automation.PSCredential -Argumentlist marc,$pdd")
-    console.log(`Invoke-Command -ComputerName localhost -ScriptBlock { ${remoteCommand} } -credential $cred | ConvertTo-Json`)
-    PS.addCommand(`Invoke-Command -ComputerName localhost -ScriptBlock { ${remoteCommand} } -credential $cred | ConvertTo-Json`)
-    */
-    // PS.addCommand(remoteCommand);
-    // PS.invoke()
-    //     .then((output) => {
-    //         console.log("Output", output)
-    //         let results = JSON.parse(output)
-    //         console.log(results);
-    //         results.forEach((s)=>s.Status = statii[s.Status]);
-    //         console.log(results[0])
-    //     }).catch((err) => {
-    //         console.error("ERROR", err)
-    //     });
-        //         let remoteCommand = `Get-Service ${this.data.Filter||""} | Select Name, Status, DisplayName, StartType`
-        //         if (false) {
-        //         PS.addCommand("$pdd = Get-Content credential1.cred | ConvertTo-SecureString;");
-        //         PS.addCommand("$cred = New-Object -TypeName System.Management.Automation.PSCredential -Argumentlist marc,$pdd;")
-        //         dp(`Invoke-Command -ComputerName localhost -ScriptBlock { ${remoteCommand} } -credential $cred | ConvertTo-Json`)
-        //         PS.addCommand(`Invoke-Command -ComputerName localhost -ScriptBlock { ${remoteCommand} } -credential $cred | ConvertTo-Json`)
-        //         }
-        //         PS.addCommand(remoteCommand);
-        //         PS.invoke()
-        //             .then((output) => {
-        //                 console.log("Output", output)
-        //                 this.data.results = JSON.parse(output)
-        //                 dp(this.data.results);
-        //                 this.data.results.forEach((s)=>s.Status = statii[s.Status]);
-        //                 console.log(this.data.results[0])
-        //             }).catch((err) => {
-        //                 console.error("ERROR", err)
-        //             });
-                //let command = "$password = Get-Content credential1.cred | ConvertTo-SecureString;"
-                //command += "$cred = New-Object -TypeName System.Management.Automation.PSCredential -Argumentlist marc,$pass;"
-                //command += `Invoke-Command -ComputerName localhost -ScriptBlock { ${remoteCommand} } -credential $cred`
-                let command = `Get-Service ${this.data.Filter||""} | Select Name, Status, DisplayName, StartType`
-                this.data.results = PS1.exec(command, {forceArray: true});
-                dp("Waiting for results...")
+                this.PS.clear();
+
+                let remoteCommand = `Get-Service`
+                let local = true;
+                if (local) this.PS.addCommand(remoteCommand + " | Select Name, Status, DisplayName, StartType, CanStop | ConvertTo-Json"); else {
+                this.PS.addCommand("$pdd = Get-Content credential1.cred | ConvertTo-SecureString");
+                this.PS.addCommand("$cred = New-Object -TypeName System.Management.Automation.PSCredential -Argumentlist marc,$pdd")
+                this.PS.addCommand(`Invoke-Command -ComputerName ${this.hostname} -ScriptBlock { ${remoteCommand} } -credential $cred | Select Name, Status, DisplayName, StartType, CanStop | ConvertTo-Json`)
+                }
+                dp(this.label, this.filter);
+                this.PS.invoke()
+                    .then((output) => {
+                        //console.log("Output", output)
+                        this.data.results = JSON.parse(output)
+                        if (!Array.isArray(this.data.results)) this.data.results = [this.data.results];
+                        if(this.data.Filter) this.data.results = this.data.results.filter(s=>this.data.Filter.indexOf(s.Name)>=0);
+                        //this.data.results.forEach((s)=>s.Status = statii[s.Status]);
+                        console.log("Results", this.label, this.data.results[0])
+                    }).catch((err) => {
+                        this.errormessage=err.message.substr(0,70)+(err.message.length>70?"...":"");
+                        console.error("ERROR", err)
+                    });
             } catch (e) {
                 this.$root._data.snack.message = e;
                 this.$root._data.snack.show = true
@@ -153,21 +126,26 @@ Vue.component('ps-dir', {
     template: `
 
   <v-card>
-  <!--<v-btn flat icon @click="getResults()"><v-icon>replay</v-icon></v-btn>-->
-  {{message}}
-  <v-list style="max-height:300px; overflow-y:scroll; overflow-x:hidden;">
-      <v-subheader><h4>{{Hostname}}</h4></v-subheader>
-          <v-list-tile v-for="res in results" :key="res.Name">
+    <v-alert :value="!!this.errormessage" type="error">{{errormessage}}</v-alert>
+
+    <v-toolbar color="cyan" dark>
+        <v-toolbar-title>{{label}} ({{Hostname}})</v-toolbar-title>
+        <v-spacer></v-spacer>
+        <v-btn flat small icon @click="getResults()"><v-icon color="#ccc">replay</v-icon></v-btn>
+        <v-btn icon><v-icon>search</v-icon></v-btn>
+    </v-toolbar>
+    <v-list style="max-height:300px; overflow-y:scroll; overflow-x:hidden;">
+        <v-list-tile v-for="res in results" :key="res.Name">
             <v-icon :color="res.Status=='Running'?'green':'red'">check_circle</v-icon>
             <v-list-tile-content>
                 <v-list-tile-title :title="res.Name" v-html="res.DisplayName"></v-list-tile-title>
-                <v-list-tile-sub-title v-html="res.Status"></v-list-tile-sub-title>
+                <v-list-tile-sub-title v-html="res.Status + ' (' + res.StartType + ')'"></v-list-tile-sub-title>
             </v-list-tile-content>
-            <v-btn flat small icon @click="clickReStart(res.Name)" color="blue"  :disabled="res.Status!='Running'"><v-icon>replay</v-icon></v-btn>
-            <v-btn flat small icon @click="clickStart(res.Name)"   color="green" :disabled="res.Status=='Running'"><v-icon>play_arrow</v-icon></v-btn>
-            <v-btn flat small icon @click="clickStop(res.Name)"    color="red"   :disabled="res.Status!='Running'"><v-icon>stop</v-icon></v-btn>
-          </v-list-tile>
-  </v-list>
+            <v-btn flat small icon @click="serviceMessage(res.Name, 'restart')" color="blue"  :disabled="res.Status!='Running'"><v-icon>replay</v-icon></v-btn>
+            <v-btn flat small icon @click="serviceMessage(res.Name, 'start')"   color="green" :disabled="res.Status=='Running'"><v-icon>play_arrow</v-icon></v-btn>
+            <v-btn flat small icon @click="serviceMessage(res.Name, 'stop')"    color="red"   :disabled="!res.CanStop"><v-icon>stop</v-icon></v-btn>
+        </v-list-tile>
+    </v-list>
 </v-card>
 `
 });
@@ -179,20 +157,10 @@ app.root = new Vue({
   }
 });
 
-if (process.env.NODE_ENV !== "production") {
-    var gui = require('nw.gui');
-    var win = gui.Window.get();
-    // Set windows size and position for debugging
-    win.moveTo(0, 0);
-    win.resizeTo(850, 764);
-    // Auto reload
-    const reloadWatcher=require('fs').watch('./', function(a,b,c) {
-        console.log(b); //return;
-        location.reload();
-        w1.close();
-        reloadWatcher.close();
-    });
-}
+process.on('exit', function () {
+    alert("Closing")
+    //a.kill();
+});
 
 //console.log(c1.change)
 //console.log(c1.$data.message)

@@ -1,10 +1,21 @@
-var pow = require("./pow").pow;
-(async function(){
-    let remoteCommand = `Get-Service | Select Name, Status, DisplayName, StartType -First 10`
-    let command = "$password = Get-Content credential1.cred | ConvertTo-SecureString;"
-    command += "$cred = New-Object -TypeName System.Management.Automation.PSCredential -Argumentlist marc,$pass;"
-    command += `Invoke-Command -ComputerName localhost -ScriptBlock { ${remoteCommand} } -credential $cred`
-    let res = await pow.execN(command);
-    console.log("result", res)
-    process.exit();
-})();
+const shell = require("node-powershell");
+
+const PS1 = new shell({ executionPolicy: 'Bypass', noProfile: false, verbose: true });
+PS1.addCommand("Get-Service A*");
+PS1.invoke()
+    .then((output) => {
+        console.log("Output A", output)
+        PS1.dispose();
+    }).catch((err) => {
+        console.error("ERROR", err)
+    });
+
+const PS2 = new shell({ executionPolicy: 'Bypass', noProfile: false, verbose: true });
+PS2.addCommand("Get-Service B*");
+PS2.invoke()
+    .then((output) => {
+        console.log("Output B", output)
+        PS2.dispose();
+    }).catch((err) => {
+        console.error("ERROR", err)
+    });
