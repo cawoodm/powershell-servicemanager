@@ -55,13 +55,13 @@ Vue.component('single-environment', {
     },
     template: `
     <div>{{config.label}}
-        <single-host v-for="server in servers" :key="server.key" :hostname="server.host" :label="server.label" :filter="server.services"></single-host>
+        <single-host v-for="server in servers" :key="server.key" :hostname="server.host" :label="server.label" :filter="server.services" :color="server.color"></single-host>
     </div>
     `
 });
 
 Vue.component('single-host', {
-    props: ['hostname', 'filter', 'label'],
+    props: ['hostname', 'filter', 'label', 'color'],
     data: function () {
         this.message=''; //PS.exec("Get-Location").Path
         dp(this.filter)
@@ -92,16 +92,19 @@ Vue.component('single-host', {
             }
         },
         getResults: function() {
-            statii=[null,"Stopped", "StartPending", "StopPending", "Running", "ContinuePending", "PausePending", "Paused"];
             try {
                 this.PS.clear();
 
                 let remoteCommand = `Get-Service`
-                let local = true;
-                if (local) this.PS.addCommand(remoteCommand + " | Select Name, Status, DisplayName, StartType, CanStop | ConvertTo-Json"); else {
-                this.PS.addCommand("$pdd = Get-Content credential1.cred | ConvertTo-SecureString");
-                this.PS.addCommand("$cred = New-Object -TypeName System.Management.Automation.PSCredential -Argumentlist marc,$pdd")
-                this.PS.addCommand(`Invoke-Command -ComputerName ${this.hostname} -ScriptBlock { ${remoteCommand} } -credential $cred | Select Name, Status, DisplayName, StartType, CanStop | ConvertTo-Json`)
+                let local = false;
+                let statii = null;
+                if (local) {
+                    statii=[null,"Stopped", "StartPending", "StopPending", "Running", "ContinuePending", "PausePending", "Paused"];
+                    this.PS.addCommand(remoteCommand + " | Select Name, Status, DisplayName, StartType, CanStop | ConvertTo-Json");
+                } else {
+                    this.PS.addCommand("$pdd = Get-Content credential1.cred | ConvertTo-SecureString");
+                    this.PS.addCommand("$cred = New-Object -TypeName System.Management.Automation.PSCredential -Argumentlist marc,$pdd")
+                    this.PS.addCommand(`Invoke-Command -ComputerName ${this.hostname} -ScriptBlock { ${remoteCommand} } -credential $cred | Select Name, Status, DisplayName, StartType, CanStop | ConvertTo-Json`)
                 }
                 dp(this.label, this.filter);
                 this.PS.invoke()
@@ -110,7 +113,7 @@ Vue.component('single-host', {
                         this.data.results = JSON.parse(output)
                         if (!Array.isArray(this.data.results)) this.data.results = [this.data.results];
                         if(this.data.Filter) this.data.results = this.data.results.filter(s=>this.data.Filter.indexOf(s.Name)>=0);
-                        //this.data.results.forEach((s)=>s.Status = statii[s.Status]);
+                        if (statii) this.data.results.forEach((s)=>s.Status = statii[s.Status]);
                         console.log("Results", this.label, this.data.results[0])
                     }).catch((err) => {
                         this.errormessage=err.message.substr(0,70)+(err.message.length>70?"...":"");
@@ -128,10 +131,10 @@ Vue.component('single-host', {
   <v-card>
     <v-alert :value="!!this.errormessage" type="error">{{errormessage}}</v-alert>
 
-    <v-toolbar color="cyan" dark>
-        <v-toolbar-title>{{label}} ({{Hostname}})</v-toolbar-title>
+    <v-toolbar :color="color || 'primary lighten-1'">
+        <v-toolbar-title :title="Hostname">{{label}}</v-toolbar-title>
         <v-spacer></v-spacer>
-        <v-btn flat small icon @click="getResults()"><v-icon color="#ccc">replay</v-icon></v-btn>
+        <v-btn flat small icon @click="getResults()"><v-icon>replay</v-icon></v-btn>
         <v-btn icon><v-icon>search</v-icon></v-btn>
     </v-toolbar>
     <v-list style="max-height:300px; overflow-y:scroll; overflow-x:hidden;">
