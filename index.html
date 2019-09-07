@@ -7,20 +7,6 @@
 <body>
 <v-app id="root">
 
-
-<v-toolbar color="blue darken-3" app dark  fixed >
-    <v-toolbar-title data-app>PowerShell Service Manager
-        <v-menu offset-y>
-            <v-btn slot="activator" color="primary" dark >Help</v-btn>
-            <v-list>
-                <v-list-tile>
-                <v-list-tile-title>About</v-list-tile-title>
-                </v-list-tile>
-            </v-list>
-        </v-menu>
-    </v-toolbar-title>
-</v-toolbar>
-
 <v-content>
     <v-container fill-height grid-list-md text-xs>
         <v-layout row wrap>
@@ -41,7 +27,8 @@
 </body>
 <script>
 const dp = console.log;
-const shell = require("node-powershell");
+//const shell = require("node-powershell");
+const shell = require("./node-powershell.js");
 const config = require('./config.json');
 let app = {};
 
@@ -64,9 +51,11 @@ Vue.component('single-host', {
     props: ['hostname', 'filter', 'label', 'color'],
     data: function () {
         this.message=''; //PS.exec("Get-Location").Path
-        dp(this.filter)
-        this.PS = new shell({ executionPolicy: 'Bypass', noProfile: false, verbose: true });
-        if (!this.data) this.data = {results: null, Hostname: this.hostname, Filter: this.filter, message: this.message, PS: this.PS, errormessage: null}
+        this.PS = new shell({ executionPolicy: 'Bypass', noProfile: false, verbose: false });
+        if (!this.data) this.data = {results: null, message: this.message}
+        this.data.errormessage = null;
+        this.data.pid = this.PS.pid;
+        this.data.collapse=false;
         try {
             this.getResults();
         } catch(e) {
@@ -85,36 +74,46 @@ Vue.component('single-host', {
                     .then((output) => {
                         this.getResults();
                     }).catch((err) => {
-                        console.error("ERROR", err)
+                        alert(`Unable to ${Action} '${SvcName}'. Try running in Admin mode.\nSee the debug console (F12) for more details.`);
+                        console.console.warn();
+                        ("ERROR", err)
                     });
             } catch(e) {
                 alert(e)
             }
         },
+        toggle: function() {
+            console.log("collapse", this.collapse, this.data.collapse)
+            this.collapse=!this.collapse;
+        },
         getResults: function() {
             try {
                 this.PS.clear();
-
-                let remoteCommand = `Get-Service`
-                let local = false;
+                let remoteCommand = `Get-Service ${this.filter.toString()}`
+                let local = true;
                 let statii = null;
+                let startTypes = null;
                 if (local) {
                     statii=[null,"Stopped", "StartPending", "StopPending", "Running", "ContinuePending", "PausePending", "Paused"];
-                    this.PS.addCommand(remoteCommand + " | Select Name, Status, DisplayName, StartType, CanStop | ConvertTo-Json");
+                    startTypes=["Boot","System", "Automatic", "Manual", "Disabled"];
+                    this.PS.addCommand(remoteCommand + " | Select Name, Status, DisplayName, StartType, CanStop | ConvertTo-Json -Compress");
                 } else {
                     this.PS.addCommand("$pdd = Get-Content credential1.cred | ConvertTo-SecureString");
                     this.PS.addCommand("$cred = New-Object -TypeName System.Management.Automation.PSCredential -Argumentlist marc,$pdd")
-                    this.PS.addCommand(`Invoke-Command -ComputerName ${this.hostname} -ScriptBlock { ${remoteCommand} } -credential $cred | Select Name, Status, DisplayName, StartType, CanStop | ConvertTo-Json`)
+                    this.PS.addCommand(`Invoke-Command -ComputerName ${this.hostname} -ScriptBlock { ${remoteCommand} } -credential $cred | Select Name, Status, DisplayName, StartType, CanStop | ConvertTo-Json -Compress`)
                 }
-                dp(this.label, this.filter);
+                //dp(this.label, this.filter);
+                let timeout = Math.round(Math.random()*1000);
                 this.PS.invoke()
-                    .then((output) => {
-                        //console.log("Output", output)
+                        .then((output) => {
+                        //dp(this.pid, "OUTPUT", output);
                         this.data.results = JSON.parse(output)
                         if (!Array.isArray(this.data.results)) this.data.results = [this.data.results];
-                        if(this.data.Filter) this.data.results = this.data.results.filter(s=>this.data.Filter.indexOf(s.Name)>=0);
-                        if (statii) this.data.results.forEach((s)=>s.Status = statii[s.Status]);
-                        console.log("Results", this.label, this.data.results[0])
+                        if (statii) this.data.results.forEach((s)=>{
+                            s.Status = statii[s.Status]
+                            s.StartType = startTypes[s.StartType]
+                        });
+                        //console.log("Results", this.label, this.data.results[0])
                     }).catch((err) => {
                         this.errormessage=err.message.substr(0,70)+(err.message.length>70?"...":"");
                         console.error("ERROR", err)
@@ -132,12 +131,13 @@ Vue.component('single-host', {
     <v-alert :value="!!this.errormessage" type="error">{{errormessage}}</v-alert>
 
     <v-toolbar :color="color || 'primary lighten-1'">
-        <v-toolbar-title :title="Hostname">{{label}}</v-toolbar-title>
+        <v-btn icon @click="toggle()"><v-icon>list</v-icon></v-btn>
+        <v-toolbar-title :title="hostname">{{label}}</v-toolbar-title>
         <v-spacer></v-spacer>
         <v-btn flat small icon @click="getResults()"><v-icon>replay</v-icon></v-btn>
-        <v-btn icon><v-icon>search</v-icon></v-btn>
+        <v-btn icon @click="search()"><v-icon>search</v-icon></v-btn>
     </v-toolbar>
-    <v-list style="max-height:300px; overflow-y:scroll; overflow-x:hidden;">
+    <v-list style="max-height:300px; overflow-y:scroll; overflow-x:hidden;" v-if="!collapse">
         <v-list-tile v-for="res in results" :key="res.Name">
             <v-icon :color="res.Status=='Running'?'green':'red'">check_circle</v-icon>
             <v-list-tile-content>
@@ -149,7 +149,8 @@ Vue.component('single-host', {
             <v-btn flat small icon @click="serviceMessage(res.Name, 'stop')"    color="red"   :disabled="!res.CanStop"><v-icon>stop</v-icon></v-btn>
         </v-list-tile>
     </v-list>
-</v-card>
+    <v-divider></v-divider>
+    </v-card>
 `
 });
 app.root = new Vue({
