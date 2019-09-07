@@ -75,8 +75,7 @@ Vue.component('single-host', {
                         this.getResults();
                     }).catch((err) => {
                         alert(`Unable to ${Action} '${SvcName}'. Try running in Admin mode.\nSee the debug console (F12) for more details.`);
-                        console.console.warn();
-                        ("ERROR", err)
+                        console.warn("ERROR", err);
                     });
             } catch(e) {
                 alert(e)
