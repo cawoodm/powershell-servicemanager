@@ -1,5 +1,5 @@
 ## PowerShell Service Manager
-A GUI for managing windows selected services on multiple machines.
+A GUI for managing selected windows services on multiple machines.
 
 Configure your environments, servers and selected servers to view and manage (start/stop/restart) only those services you need.
 
