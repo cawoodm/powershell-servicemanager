@@ -2,7 +2,7 @@
   "name": "powershell-servicemanager",
   "version": "1.0.0",
   "description": "",
-  "main": "app.js",
+  "main": "main.js",
   "scripts": {
     "start": "nw ."
   },
