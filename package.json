@@ -4,7 +4,7 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "start": "nw ."
+    "start": "electron ."
   },
   "author": "Marc Cawood",
   "license": "MIT",

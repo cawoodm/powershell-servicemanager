@@ -1,7 +1,8 @@
 const dp = console.log;
-//const shell = require("node-powershell");
 const shell = require("./node-powershell.js");
-const config = require('./config.js');
+const homedir = require('os').homedir();
+const fs = require('fs');
+const config = fs.existsSync(homedir+'/pssm/config.js')?require(homedir+'/pssm/config.js'):require('config.js');
 let app = {};
 process.chdir(__dirname);
 
@@ -24,7 +25,6 @@ Vue.component('single-environment', {
     props: ['name'],
     data: function() {
         let data = {};
-        dp(this.name)
         data.config = config.environments.filter(f=>f.key==this.name)[0];
         data.hosts = data.config.hosts;
         return data;
@@ -47,7 +47,7 @@ Vue.component('single-host', {
     props: ['hostname', 'filter', 'label', 'color', 'credential'],
     data: function () {
         this.message=''; //PS.exec("Get-Location").Path
-        this.PS = new shell({ executionPolicy: 'Bypass', noProfile: false, verbose: false });
+        this.PS = new shell({ executionPolicy: 'Bypass', noProfile: false, verbose: true });
         if (!this.data) this.data = {results: null, message: this.message}
         this.data.errormessage = null;
         this.data.pid = this.PS.pid;
