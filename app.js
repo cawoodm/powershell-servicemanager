@@ -85,6 +85,7 @@ Vue.component('single-host', {
             try {
                 this.PS.clear();
                 let remoteCommand = `Get-Service ${this.filter.toString()}`
+                this.data.errormessage = null;
                 let local = false;
                 let statii = null;
                 let startTypes = null;
