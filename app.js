@@ -65,7 +65,9 @@ Vue.component('single-host', {
             try {
                 Actions={start:"Start",stop:"Stop",restart:"Restart"}
                 Action=Actions[Action];
-                this.PS.addCommand(`${Action}-Service ${SvcName}`);
+                let remoteCommand = `${Action}-Service ${SvcName}`;
+                console.log(`Invoke-Command -ComputerName ${this.hostname} -ScriptBlock { ${remoteCommand} } -credential $cred`)
+                this.PS.addCommand(`Invoke-Command -ComputerName ${this.hostname} -ScriptBlock { ${remoteCommand} } -credential $cred`)
                 this.PS.invoke()
                     .then((output) => {
                         this.getResults();
@@ -94,10 +96,10 @@ Vue.component('single-host', {
                     startTypes=["Boot","System", "Automatic", "Manual", "Disabled"];
                     this.PS.addCommand(remoteCommand + " | Select Name, Status, DisplayName, StartType, CanStop | ConvertTo-Json -Compress");
                 } else {
-                    let credUser = config.credentials[this.credential].username;
-                    let credPath = config.credentials[this.credential].path;
-                    this.PS.addCommand(`$pdd = Get-Content "${credPath}" | ConvertTo-SecureString`);
-                    this.PS.addCommand(`$cred = New-Object -TypeName System.Management.Automation.PSCredential -Argumentlist "${credUser}",$pdd`)
+                    let credName = this.credential;
+                    this.PS.addCommand(`$user = Get-Content "~/pssm/${credName}.cred.txt"`);
+                    this.PS.addCommand(`$pdd = Get-Content "~/pssm/${credName}.cred" | ConvertTo-SecureString`);
+                    this.PS.addCommand(`$cred = New-Object -TypeName System.Management.Automation.PSCredential -Argumentlist "$user",$pdd`)
                     this.PS.addCommand(`Invoke-Command -ComputerName ${this.hostname} -ScriptBlock { ${remoteCommand} } -credential $cred | Select Name, Status, DisplayName, StartType, CanStop | ConvertTo-Json -Compress`)
                 }
                 //dp(this.label, this.filter);
@@ -117,8 +119,9 @@ Vue.component('single-host', {
                         console.error("ERROR", err)
                     });
             } catch (e) {
-                this.$root._data.snack.message = e;
-                this.$root._data.snack.show = true
+                /*this.$root._data.snack.message = e;
+                this.$root._data.snack.show = true*/
+                alert(e);
                 console.error(e);
             }
         }
